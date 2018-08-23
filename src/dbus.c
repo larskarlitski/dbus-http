@@ -6,6 +6,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
+#include <systemd/sd-bus.h>
 
 static void * grow_pointer_array(void *array, size_t *allocedp) {
         if (*allocedp == 0)
@@ -237,6 +239,7 @@ static void start_element(void *data, const char *element, const char **attribut
                                         state->level = STATE_ARGUMENT;
                                 }
                         }
+                        break;
                 }
 
                 case STATE_INTERFACE: {
@@ -335,4 +338,120 @@ DBusMethod * dbus_node_find_method(DBusNode *node, const char *interface_name, c
         }
 
         return NULL;
+}
+
+static const char valid_dbus_basic_types[] = {
+        SD_BUS_TYPE_BYTE,
+        SD_BUS_TYPE_INT16,
+        SD_BUS_TYPE_UINT16,
+        SD_BUS_TYPE_INT32,
+        SD_BUS_TYPE_UINT32,
+        SD_BUS_TYPE_INT64,
+        SD_BUS_TYPE_UINT64,
+        SD_BUS_TYPE_DOUBLE,  // this is the last number type
+        SD_BUS_TYPE_STRING,
+        SD_BUS_TYPE_BOOLEAN,
+        SD_BUS_TYPE_OBJECT_PATH,
+        SD_BUS_TYPE_SIGNATURE,
+        SD_BUS_TYPE_UNIX_FD
+};
+
+bool bus_type_is_number(char c) {
+        return !!memchr(valid_dbus_basic_types, c, 8);
+}
+
+bool bus_type_is_dbus_dict_key(char c) {
+        return !!memchr(valid_dbus_basic_types, c, 9);
+}
+
+bool bus_type_is_basic(char c) {
+        return !!memchr(valid_dbus_basic_types, c, sizeof(valid_dbus_basic_types));
+}
+
+static int signature_element_length_internal(
+                const char *s,
+                bool allow_dict_entry,
+                unsigned array_depth,
+                unsigned struct_depth,
+                size_t *l) {
+
+        int r;
+
+        if (!s)
+                return -EINVAL;
+
+        assert(l);
+
+        if (bus_type_is_basic(*s) || *s == SD_BUS_TYPE_VARIANT) {
+                *l = 1;
+                return 0;
+        }
+
+        if (*s == SD_BUS_TYPE_ARRAY) {
+                size_t t;
+
+                if (array_depth >= 32)
+                        return -EINVAL;
+
+                r = signature_element_length_internal(s + 1, true, array_depth+1, struct_depth, &t);
+                if (r < 0)
+                        return r;
+
+                *l = t + 1;
+                return 0;
+        }
+
+        if (*s == SD_BUS_TYPE_STRUCT_BEGIN) {
+                const char *p = s + 1;
+
+                if (struct_depth >= 32)
+                        return -EINVAL;
+
+                while (*p != SD_BUS_TYPE_STRUCT_END) {
+                        size_t t;
+
+                        r = signature_element_length_internal(p, false, array_depth, struct_depth+1, &t);
+                        if (r < 0)
+                                return r;
+
+                        p += t;
+                }
+
+                *l = p - s + 1;
+                return 0;
+        }
+
+        if (*s == SD_BUS_TYPE_DICT_ENTRY_BEGIN && allow_dict_entry) {
+                const char *p = s + 1;
+                unsigned n = 0;
+
+                if (struct_depth >= 32)
+                        return -EINVAL;
+
+                while (*p != SD_BUS_TYPE_DICT_ENTRY_END) {
+                        size_t t;
+
+                        if (n == 0 && !bus_type_is_basic(*p))
+                                return -EINVAL;
+
+                        r = signature_element_length_internal(p, false, array_depth, struct_depth+1, &t);
+                        if (r < 0)
+                                return r;
+
+                        p += t;
+                        n++;
+                }
+
+                if (n != 2)
+                        return -EINVAL;
+
+                *l = p - s + 1;
+                return 0;
+        }
+
+        return -EINVAL;
+}
+
+int signature_element_length(const char *s, size_t *l) {
+        return signature_element_length_internal(s, true, 0, 0, l);
 }

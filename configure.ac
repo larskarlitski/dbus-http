@@ -16,8 +16,8 @@ AC_CONFIG_HEADERS([build/config.h])
 AC_CONFIG_AUX_DIR([build/build-aux])
 
 # suppress conflicting defaults
-CFLAGS=${CFLAGS:-""}
-CXXFLAGS=${CXXFLAGS:-""}
+# CFLAGS=${CFLAGS:-""}
+# CXXFLAGS=${CXXFLAGS:-""}
 
 AC_USE_SYSTEM_EXTENSIONS
 AC_SYS_LARGEFILE
@@ -30,6 +30,22 @@ AC_PROG_CC_C99
 AC_PROG_RANLIB
 
 m4_pattern_forbid([^_?PKG_[A-Z_]+$],[*** pkg.m4 missing, please install pkg-config])
+
+# systemd unit support
+AC_ARG_WITH([systemdsystemunitdir], AS_HELP_STRING([--with-systemdsystemunitdir=DIR],
+	[Directory for systemd service files]))
+# default location
+AS_IF([test -z "$with_systemdsystemunitdir" && $PKG_CONFIG systemd],
+	with_systemdsystemunitdir="\$(prefix)/lib/systemd/system")
+AS_IF([test -z "$with_systemdsystemunitdir"], with_systemdsystemunitdir=no)
+# add conditional and subst
+AM_CONDITIONAL(HAVE_SYSTEMD, [test "$with_systemdsystemunitdir" != no])
+if test "$with_systemdsystemunitdir" != no; then
+	AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])
+	AC_DEFINE(HAVE_SYSTEMD, 1, [Define if systemd support is available])
+else
+	AC_DEFINE(HAVE_SYSTEMD, 0, [Define if systemd support is available])
+fi
 
 # ------------------------------------------------------------------------------
 # toolchain
@@ -116,6 +132,7 @@ AC_MSG_RESULT([
         prefix:                 ${prefix}
         exec_prefix:            ${exec_prefix}
         includedir:             ${includedir}
+        systemdunitdir:         ${with_systemdsystemunitdir}
 
         CFLAGS:                 ${OUR_CFLAGS} ${CFLAGS}
         CPPFLAGS:               ${OUR_CPPFLAGS} ${CPPFLAGS}

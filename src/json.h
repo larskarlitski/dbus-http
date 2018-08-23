@@ -21,7 +21,7 @@ int json_parse(const char *string, JsonValue **valuep, unsigned expected_type);
 
 JsonValue * json_value_free(JsonValue *value);
 void json_value_freep(JsonValue **valuep);
-JsonType json_value_get_type(JsonValue *value);
+JsonType json_value_get_type(const JsonValue *value);
 
 const char * json_value_get_string(JsonValue *value);
 double json_value_get_number(JsonValue *value);
@@ -43,3 +43,13 @@ bool json_array_get(JsonValue *value, size_t index, JsonValue **valuep, unsigned
 int json_array_append(JsonValue *value, JsonValue *element);
 
 void json_print(JsonValue *value, FILE *f);
+
+
+typedef struct JsonObjectEntry JsonObjectEntry;
+char* json_object_entry_key(JsonObjectEntry* joe);
+JsonValue* json_object_entry_value(JsonObjectEntry* joe);
+
+typedef struct JsonObjectIterator JsonObjectIterator;
+JsonObjectIterator* json_object_iterator_new(JsonValue* jobject);
+void json_object_iterator_freep(JsonObjectIterator **joiter);
+JsonObjectEntry* json_object_iterator_next(JsonObjectIterator* joiter);

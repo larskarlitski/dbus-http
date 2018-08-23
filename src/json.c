@@ -8,7 +8,6 @@
 
 #define _cleanup_(func) __attribute__((__cleanup__(func)))
 
-typedef struct JsonObjectEntry JsonObjectEntry;
 
 struct JsonValue {
         JsonType type;
@@ -33,6 +32,15 @@ struct JsonObjectEntry {
         char *key;
         JsonValue *value;
 };
+
+char* json_object_entry_key(JsonObjectEntry* joe){
+        return joe->key;
+}
+
+JsonValue* json_object_entry_value(JsonObjectEntry* joe) {
+        return joe->value;
+}
+
 
 static bool json_read_value(const char **j, JsonValue **valuep);
 
@@ -358,7 +366,7 @@ int json_parse(const char *string, JsonValue **valuep, unsigned expected_type) {
         return 0;
 }
 
-JsonType json_value_get_type(JsonValue *value) {
+JsonType json_value_get_type(const JsonValue *value) {
         return value->type;
 }
 
@@ -555,8 +563,23 @@ static void json_print_string(const char *string, FILE *f) {
                 else if (*p == '\\')
                         fputs("\\\\", f);
 
-                else if (*p < ' ' || *p > 0x7f)
-                        fprintf(f, "\\%.3o", *p);
+                else if (*p == '/')
+                        fputs("\\/", f);
+
+                else if (*p == '\b')
+                        fputs("\\b", f);
+
+                else if (*p == '\f')
+                        fputs("\\f", f);
+
+                else if (*p == '\n')
+                        fputs("\\n", f);
+
+                else if (*p == '\r')
+                        fputs("\\r", f);
+
+                else if (*p == '\t')
+                        fputs("\\t", f);
 
                 else
                         fprintf(f, "%c", *p);
@@ -614,4 +637,37 @@ void json_print(JsonValue *value, FILE *f) {
                         fputs("null", f);
                         break;
         }
+}
+
+
+struct JsonObjectIterator {
+        const JsonValue* jobject;
+        unsigned index;
+};
+
+JsonObjectIterator* json_object_iterator_new(JsonValue* jobject){
+        JsonObjectIterator* joiter = (JsonObjectIterator*)calloc(1, sizeof(JsonObjectIterator));
+
+        if(jobject->type != JSON_TYPE_OBJECT){
+                free(joiter);
+                return NULL;
+        }
+
+        joiter->jobject = jobject;
+        joiter->index = 0;
+        return joiter;
+}
+
+void json_object_iterator_freep(JsonObjectIterator **joiter) {
+        if (*joiter)
+                free(*joiter);
+}
+
+JsonObjectEntry* json_object_iterator_next(JsonObjectIterator* joiter){
+        if(joiter->jobject->object.n_entries > joiter->index){
+                JsonObjectEntry* joe = joiter->jobject->object.entries[joiter->index];
+                joiter->index++;
+                return joe;
+        }
+        return NULL;
 }

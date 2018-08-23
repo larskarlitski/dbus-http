@@ -1,0 +1,3 @@
+[submodule "test/dbussy"]
+	path = test/dbussy
+	url = https://github.com/ldo/dbussy.git

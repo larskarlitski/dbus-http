@@ -1,0 +1,12 @@
+[Unit]
+Description=Webserver with HTTP to DBUS bridge
+After=network.target
+
+[Service]
+Restart=on-failure
+ExecStart=@bindir@/dbus-http
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

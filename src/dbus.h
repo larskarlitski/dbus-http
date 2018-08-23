@@ -50,3 +50,7 @@ int dbus_node_new_from_xml(DBusNode **nodep, const char *xml);
 DBusNode * dbus_node_free(DBusNode *node);
 void dbus_node_freep(DBusNode **nodep);
 DBusMethod * dbus_node_find_method(DBusNode *node, const char *interface_name, const char *method_name);
+int signature_element_length(const char *s, size_t *l);
+bool bus_type_is_number(char c);
+bool bus_type_is_dbus_dict_key(char c);
+bool bus_type_is_basic(char c);

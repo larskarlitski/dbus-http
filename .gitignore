@@ -10,6 +10,7 @@
 /install-tree
 
 /dbus-http
+/dbus-http-testd
 
 *.swp
 *.o

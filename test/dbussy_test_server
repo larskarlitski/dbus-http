@@ -1,0 +1,75 @@
+#!/usr/bin/python3
+
+import asyncio
+import dbussy as dbus
+from dbussy import DBUS
+import ravel
+
+my_bus_name = "dbus.http.dbussyTest"
+my_path_name = "/TestIf1"
+my_iface_name = "dbus.http.dbussyTest"
+
+loop = asyncio.get_event_loop()
+
+# AbstractEventLoop.set_debug()
+# logging.getLogger('asyncio').setLevel(logging.WARNING)
+
+@ravel.interface(ravel.INTERFACE.SERVER, name=my_iface_name)
+class DbusHttpTest:
+
+    def __init__(self):
+        self._a_string = "initial value with äöü"
+        self._array_struct_ss = [("foo1", "bar1"), ("foo2", "bar2")]
+        self._array_struct_svs = [("foo1", ('u', 7), "bar1"), ("foo2", ('s', "another string"), "bar2")]
+
+    @ravel.method(name="get_string", in_signature="", out_signature="s")
+    def handle_get_string(self):
+        print("TS get_string: %s" % self._a_string)
+        return [self._a_string]
+
+    @ravel.method(name="set_string", in_signature="s", out_signature="", args_keyword="a_string")
+    def handle_set_string(self, a_string):
+        self._a_string = a_string[0]
+        print("TS set_string: %s" % self._a_string)
+        return []
+
+    @ravel.method(name="get_array_struct_ss", in_signature="", out_signature="a(ss)")
+    def handle_get_array_struct_ss(self):
+        return [self._array_struct_ss]
+
+    @ravel.method(name="set_array_struct_ss", in_signature="a(ss)", out_signature="", args_keyword="a_struct_ss")
+    def handle_set_array_struct_ss(self, a_struct_ss):
+        self._array_struct_ss = a_struct_ss[0]
+        return []
+
+    @ravel.method(name="get_array_struct_svs", in_signature="", out_signature="a(svs)")
+    def handle_get_array_struct_svs(self):
+        return [self._array_struct_svs]
+
+    @ravel.method(name="set_array_struct_svs", in_signature="a(svs)", out_signature="", args_keyword="a_struct_svs")
+    def handle_set_array_struct_svs(self, a_struct_svs):
+        self._array_struct_svs = a_struct_svs[0]
+        return []
+
+    @ravel.method(name = "stop", in_signature = "", out_signature = "",
+        connection_keyword = "conn", message_keyword = "message")
+    def handle_stop(self, conn, message) :
+        loop.stop()
+        conn.send(message.new_method_return())
+
+bus = ravel.session_bus()
+bus.attach_asyncio(loop)
+bus.request_name(bus_name=my_bus_name, flags=DBUS.NAME_FLAG_DO_NOT_QUEUE)
+bus.register(path=my_path_name, fallback=True, interface=DbusHttpTest())
+try :
+    loop.run_forever()
+except KeyboardInterrupt :
+    # is there an easier way of cleaning up than this?
+    for task in asyncio.Task.all_tasks(loop) :
+        task.cancel()
+        try :
+            loop.run_until_complete(task)
+        except asyncio.CancelledError:
+            pass
+    print() # avoid terminal prompt appearing after ^C
+bus = None
